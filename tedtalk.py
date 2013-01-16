@@ -9,7 +9,7 @@ class SearchError(Exception):
 class TedTalk():
     def __init__(self, url = None, searchPattern = None):
         if searchPattern and url:
-            raise UrlError("can't set both searchPattern and url")
+            raise UrlError("shouldn't set both searchPattern and url")
         elif url:
             self.url = url
         elif searchPattern:
@@ -17,9 +17,7 @@ class TedTalk():
 
         self._set_webpage_by_url()
         self._parse_webpage()
-        # self._set_mp4url_by_webpage()
-        # self._set_tedid_by_webpage()
-        # self._set_topic_speaker_by_webpage()
+
 
 
     def _set_url_by_search(self, searchfor):
@@ -33,40 +31,27 @@ class TedTalk():
         try:
             data = results['responseData']
         except:
-            raise SearchError
-        # print 'Total results: %s' % data['cursor']['estimatedResultCount']
-        # hits = data['results']
-        # print 'Top %d hits:' % len(hits)
-        # for h in hits: print ' ', h['url']
-        # print 'For more results, see %s' % data['cursor']['moreResultsUrl']
+            raise SearchError("no result, searchPattern:" + searchfor)
+
         self.url = data['results'][0]['url']
 
     def _set_webpage_by_url(self):
         import urllib
-        try:
 
-            connection = urllib.urlopen(self.url)
-            encoding = connection.headers.getparam('charset')
-            self.webpage = connection.read().decode(encoding)
-        except:
-            raise UrlError
+        connection = urllib.urlopen(self.url)
+        encoding = connection.headers.getparam('charset')
+        self.webpage = connection.read().decode(encoding)
 
     def _parse_webpage(self):
         from HTMLParser import HTMLParser
         from collections import defaultdict
-
+        from htmlentitydefs import name2codepoint
         class _TEDPageParser(HTMLParser):
             def __init__(self):
                 HTMLParser.__init__(self)
                 self.intitle = True
-                self.mp4url = self.title = self.tedid = None
-
-            # def close(self):
-                # HTMLParser.close(self)
-                # if not self.mp4url or not self.title or not self.tedid:
-                    # raise ParseError
-
-
+                self.mp4url =  self.tedid = None
+                self.title = ''
 
             def handle_starttag(self, tag, attrs):
                 attrs = defaultdict(str, attrs)
@@ -75,8 +60,11 @@ class TedTalk():
                     # self.close()
                     return
 
-                if tag == 'title':
-                    self.intitle = True
+                if tag == 'meta' and attrs['name'] == 'title':
+                    title = attrs['content']
+                    self.speaker, title = title.split(': ',1)
+                    self.topic, _ = title.rsplit(' | Video on TED.com')
+
                 elif tag == 'a' and attrs['id'] == 'no-flash-video-download':
                     if  attrs.has_key('href') :
                         self.mp4url = attrs['href'] + '?apikey=TEDDOWNLOAD'
@@ -90,42 +78,13 @@ class TedTalk():
                     else:
                         raise ParseError
 
-
-            def handle_data(self, data):
-                if self.intitle:
-                    self.title = data
-                    self.intitle = False
-
         parser = _TEDPageParser()
         parser.feed(self.webpage)
+
         self.mp4url = parser.mp4url
-        self.title = parser.title
+        self.speaker = parser.speaker
+        self.topic = parser.topic
         self.tedid = parser.tedid
-
-
-
-
-
-    # def _set_mp4url_by_webpage(self):
-
-    #     from HTMLParser import HTMLParser
-    #     from collections import defaultdict
-    #     class _TEDPageParser(HTMLParser):
-
-    #     parser = _TEDPageParser()
-    #     parser.feed(self.webpage)
-    #     self.mp4url = parser.mp4url
-
-
-
-    # def _set_tedid_by_webpage(self):
-    #     import re
-
-    #     tedid = re.search('\[ted id=(\d+)\]', self.webpage)
-    #     if tedid:
-    #         self.tedid = int(tedid.group(1))
-    #     else:
-    #         raise ParseError
 
 
     def download_mp4(self, f):
@@ -148,7 +107,6 @@ class TedTalk():
             status = "{0:10d}  [{1:3.2f}%]".format(file_size_dl, file_size_dl * 100. / file_size)
             status = status + chr(8)*(len(status)+1)
             print status,
-
 
 
     def obtain_subtitle(self, lang = 'english'):
@@ -199,57 +157,3 @@ class TedTalk():
         import urlparse
 
         return basename(urlparse.urlsplit(self.mp4url).path)
-
-
-
-    # from web
-
-
-    # def getVideoParameters(urldirection):
-    #     ht = urllib.urlopen(urldirection).read()
-    #     var = re.search('flashVars = {\n([^}]+)}', ht)
-    #     if var:
-    #         var = var.group(1)
-    #     else:
-    #         return None
-    #     var = [a.replace('\t', '') for a in var.split('\n')]
-    #     for a in range(len(var)):
-    #         if var[a]:
-    #             var[a] = var[a][:var[a].rfind(',')]
-    #     resultado = []
-    #     for a in var:
-    #         l = a.find(':')
-    #         if l != -1:
-    #             resultado.append((a[:l], a[l+1:]))
-    #     return dict(resultado)
-
-
-
-
-
-    # def downloadSub(idtalk, lang, timeIntro):
-    #     print("Downloading subtitles for language %s"%lang)
-    #     c = simplejson.load(urllib.urlopen('http://www.ted.com/talks/subtitles/id/%s/lang/%s'%(idtalk, lang)))
-    #     salida = file('subs_%s_%s.srt'%(idtalk,lang), 'w')
-    #     conta = 1
-    #     c = c['captions']
-    #     for linea in c:
-    #         salida.write("%d\n"%conta)
-    #         conta += 1
-    #         salida.write("%s --> %s\n"%(getFormatedTime(timeIntro+linea['startTime']), getFormatedTime(timeIntro+linea['startTime']+linea['duration'])))
-    #         salida.write("%s\n\n"%(linea['content'].encode('utf-8')))
-    #     salida.close()
-
-    # def availableSubs(subs):
-    #     a = subs.find("LanguageCode")
-    #     if a == -1:
-    #         return []
-    #     subs = subs[a+len("LanguageCode"):]
-    #     return [re.search("%22([^A-Z]+)%22", subs).group(1)] + availableSubs(subs)
-
-    # def getFormatedTime(intvalue):
-    #     mils = intvalue%1000
-    #     segs = (intvalue/1000)%60
-    #     mins = (intvalue/60000)%60
-    #     hors = (intvalue/3600000)
-    #     return "%02d:%02d:%02d,%03d"%(hors,mins,segs,mils)
