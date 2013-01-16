@@ -11,7 +11,7 @@ Create TedTalk object
     >>> tt = tedtalk.TedTalk(url = 'http://www.ted.com/talks/simon_lewis_don_t_take_consciousness_for_granted.html')
     >>> tt = tedtalk.TedTalk(searchPattern = "Don't take consciousness for granted")  # search google
 
-Usage ob TedTalk object
+Usage of TedTalk object
 --------
 
 ### Basic parse result ###
